@@ -15,7 +15,7 @@ using namespace std;
 
 enum CardColor { RED, GREEN, BLUE, YELLOW, NONE };
 enum CardType { NUMBER, SKIP, REVERSE, DRAW_TWO, WILD, WILD_DRAW_FOUR };
-enum GameState { PLAYER_TURN, AI_TURN, AI_THINKING, WILD_COLOR_SELECT, ANIMATING_PLAYER_PLAY, ANIMATING_PLAYER_DRAW, ANIMATING_AI_PLAY, ANIMATING_AI_DRAW, GAME_OVER_PLAYER_WON, GAME_OVER_AI_WON };
+enum GameState { PLAYER_TURN, AI_TURN, AI_THINKING, WILD_COLOR_SELECT, ANIMATING_PLAYER_PLAY, ANIMATING_PLAYER_DRAW, ANIMATING_AI_PLAY, ANIMATING_AI_DRAW, GAME_OVER_PLAYER_WON, GAME_OVER_AI_WON, HOW_TO_PLAY };
 
 class Card {
     public:
@@ -40,6 +40,7 @@ vector<Card> discardPile;
 
 GameState gameState = PLAYER_TURN;
 CardColor wildSelectedColor = NONE;
+GameState previousState = PLAYER_TURN;
 double aiThinkingStartTime;
 
 bool canSelectWildColor = false;
@@ -49,6 +50,7 @@ GLuint backgroundTextureID;
 GLuint playerAvatarID;
 GLuint aiAvatarID;
 GLuint crownTextureID;
+GLuint howToPlayTextureID;
 
 GLuint loadTexture(const char* path) {
     GLuint textureID;
@@ -189,6 +191,7 @@ GLuint createShader(const char* vertexSource, const char* fragmentSource) {
 void nextTurn();
 void layoutHand();
 void layoutAIHand();
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 
 void colorToRGB(CardColor c, float& r, float& g, float& b) {
@@ -603,6 +606,29 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
                 }
             }
         }
+
+        if (gameState == HOW_TO_PLAY) {
+            gameState = previousState;
+            return;
+        }
+
+        // Help Button Check (Top Right)
+        if (x > 0.8f && y > 0.8f) {
+            previousState = gameState;
+            gameState = HOW_TO_PLAY;
+            return;
+        }
+    }
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_H && action == GLFW_PRESS) {
+        if (gameState == HOW_TO_PLAY) {
+            gameState = previousState;
+        } else {
+            previousState = gameState;
+            gameState = HOW_TO_PLAY;
+        }
     }
 }
 
@@ -620,6 +646,7 @@ int main() {
 
     stbi_set_flip_vertically_on_load(true);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetKeyCallback(window, key_callback);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -647,6 +674,7 @@ int main() {
     playerAvatarID = loadTexture("textures/player_avatar.png");
     aiAvatarID = loadTexture("textures/ai_avatar.png");
     crownTextureID = loadTexture("textures/crown.png");
+    howToPlayTextureID = loadTexture("textures/how_to_play.png");
 
     GLuint VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -770,6 +798,15 @@ int main() {
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
+        // Render Help Button Indicator (Top Right)
+        glUseProgram(uiShader);
+        glBindVertexArray(uiVAO);
+        glUniform2f(uiPosLoc, 0.85f, 0.85f);
+        glUniform2f(uiSizeLoc, 0.1f, 0.1f);
+        glUniform3f(uiColorLoc, 0.5f, 0.5f, 0.5f); // Grey button
+        glUniform1f(uiAlphaLoc, 0.6f);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
         glUseProgram(shaderProg);
         glBindVertexArray(VAO);
 
@@ -876,6 +913,18 @@ int main() {
         } else if (gameState == GAME_OVER_AI_WON) {
             glUniform2f(offsetLoc, 0.0f, 0.35f + avatarSize/2 + crownSize/2);
             glUniform2f(scaleLoc, crownSize, crownSize);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+
+        if (gameState == HOW_TO_PLAY) {
+            glUseProgram(shaderProg);
+            glBindVertexArray(backgroundVAO);
+            glBindTexture(GL_TEXTURE_2D, howToPlayTextureID);
+            glUniform2f(offsetLoc, 0.0f, 0.0f);
+            glUniform2f(scaleLoc, 1.0f, 1.0f);
+            glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
+            glUniform1f(highlightLoc, 0.0f);
+            glUniform1i(hasTextureLoc, 1);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
 
